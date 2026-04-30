@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Inventory Tracker — HustleBot AI</title>
+<!-- eBay fee logic: 13.25% final value fee on sale price + $0.30 per transaction (standard seller, no store) -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f9f9f7;
+    --surface: #ffffff;
+    --border: #e8e8e4;
+    --border-strong: #d0d0c8;
+    --text: #1a1a18;
+    --text-secondary: #6b6b62;
+    --accent: #0a0a0a;
+    --accent-green: #1a7a4a;
+    --accent-red: #b03a2e;
+    --accent-blue: #1a4a8a;
+    --tag-bg: #f0f0ec;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
+    --shadow-hover: 0 4px 12px rgba(0,0,0,0.1), 0 12px 32px rgba(0,0,0,0.08);
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px;
+    letter-spacing: -0.3px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo span {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-left: 1px solid var(--border-strong);
+    padding-left: 10px;
+    margin-left: 4px;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 7px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+    text-decoration: none;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #333; }
+  .btn-outline {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+  }
+  .btn-outline:hover { background: var(--tag-bg); }
+  .btn-danger {
+    background: transparent;
+    color: var(--accent-red);
+    border: 1px solid #f0d0cc;
+  }
+  .btn-danger:hover { background: #fdf3f2; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+  }
+  .stat-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.5px;
+  }
+  .stat-value.green { color: var(--accent-green); }
+  .stat-value.red { color: var(--accent-red); }
+
+  /* ── TOOLBAR ── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    gap: 12px;
+  }
+
+  .search-wrap {
+    position: relative;
+    flex: 1;
+    max-width: 340px;
+  }
+  .search-wrap svg {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+  }
+  .search-input {
+    width: 100%;
+    padding: 8px 12px 8px 34px;
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-input:focus { border-color: var(--accent); }
+
+  .filter-select {
+    padding: 8px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+    cursor: pointer;
+  }
+
+  /* ── VIEW TOGGLES ── */
+  .view-toggle {
+    display: flex;
+    gap: 2px;
+    background: var(--tag-bg);
+    border-radius: 8px;
+    padding: 3px;
+  }
+  .view-btn {
+    padding: 5px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+  }
+  .view-btn.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  /* ── GRID VIEW ── */
+  .inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  .item-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: box-shadow 0.2s, transform 0.2s;
+    cursor: pointer;
+    position: relative;
+  }
+  .item-card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+  }
+
+  .card-photo {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    background: var(--tag-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--border-strong);
+    font-size: 36px;
+  }
+  .card-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .card-body { padding: 14px 16px; }
+
+  .card-title {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-prices {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .price-bought { font-size: 12px; color: var(--text-secondary); }
+  .price-sell { font-size: 15px; font-weight: 600; color: var(--text); }
+  .profit-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 20px;
+  }
+  .profit-badge.pos { background: #e8f5ee; color: var(--accent-green); }
+  .profit-badge.neg { background: #fdecea; color: var(--accent-red); }
+
+  .card-status {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 20px;
+    display: inline-block;
+  }
+  .status-listed { background: #e8f0fd; color: var(--accent-blue); }
+  .status-unlisted { background: var(--tag-bg); color: var(--text-secondary); }
+  .status-sold { background: #e8f5ee; color: var(--accent-green); }
+
+  .card-actions {
+    display: flex;
+    gap: 6px;
+    padding: 10px 16px 14px;
+    border-top: 1px solid var(--border);
+    justify-content: flex-end;
+  }
+
+  /* ── TABLE VIEW ── */
+  .inventory-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .inventory-table th {
+    padding: 11px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    background: var(--tag-bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .inventory-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  .inventory-table tr:last-child td { border-bottom: none; }
+  .inventory-table tr:hover td { background: #fafaf8; }
+
+  .table-thumb {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: var(--tag-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 80px 24px;
+    color: var(--text-secondary);
+  }
+  .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+  .empty-state h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .empty-state p { font-size: 14px; margin-bottom: 24px; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 540px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    animation: slideUp 0.2s ease;
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .modal-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .modal-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    color: var(--text);
+  }
+  .modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    color: var(--text-secondary);
+    padding: 4px;
+    line-height: 1;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  .modal-body { padding: 20px 24px 24px; }
+
+  /* ── FORM ── */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+  }
+  input[type="text"], input[type="number"], textarea, select {
+    padding: 9px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--surface);
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 72px; }
+
+  .photo-upload {
+    border: 2px dashed var(--border-strong);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--bg);
+  }
+  .photo-upload:hover { border-color: var(--accent); background: var(--tag-bg); }
+  .photo-upload input { display: none; }
+  .photo-preview {
+    width: 100%;
+    max-height: 160px;
+    object-fit: contain;
+    border-radius: 6px;
+    margin-top: 10px;
+    display: none;
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── DETAIL MODAL ── */
+  .detail-photo {
+    width: 100%;
+    max-height: 220px;
+    object-fit: contain;
+    border-radius: 8px;
+    background: var(--tag-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    min-height: 120px;
+    margin-bottom: 18px;
+  }
+  .detail-photo img { width: 100%; max-height: 220px; object-fit: contain; border-radius: 8px; }
+
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-key {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+  .detail-val { font-size: 14px; color: var(--text); text-align: right; }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--accent);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.25s;
+    z-index: 999;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  @media (max-width: 900px) {
+    .stats-bar { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+    .form-grid { grid-template-columns: 1fr; }
+    main { padding: 20px 16px; }
+    header { padding: 0 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    HustleBot AI
+    <span>Inventory</span>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-outline btn-sm" onclick="exportCSV()">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export CSV
+    </button>
+    <button class="btn btn-primary" onclick="openAddModal()">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Item
+    </button>
+  </div>
+</header>
+
+<!-- eBay Fee Settings Strip -->
+<div style="background:#fafaf8;border-bottom:1px solid var(--border);padding:9px 32px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+  <span style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-secondary);">eBay Fee Settings</span>
+  <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);font-weight:400;text-transform:none;letter-spacing:0;">
+    Final Value Fee %
+    <input type="number" id="cfg_fvf" value="13.25" step="0.01" min="0" max="100"
+      style="width:68px;padding:4px 8px;font-size:12px;border:1px solid var(--border-strong);border-radius:6px;font-family:'DM Sans',sans-serif;outline:none;"
+      oninput="renderInventory()" />
+  </label>
+  <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);font-weight:400;text-transform:none;letter-spacing:0;">
+    Per-Transaction ($)
+    <input type="number" id="cfg_txn" value="0.30" step="0.01" min="0"
+      style="width:68px;padding:4px 8px;font-size:12px;border:1px solid var(--border-strong);border-radius:6px;font-family:'DM Sans',sans-serif;outline:none;"
+      oninput="renderInventory()" />
+  </label>
+  <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);font-weight:400;text-transform:none;letter-spacing:0;">
+    Shipping Cost ($)
+    <input type="number" id="cfg_ship" value="0.00" step="0.01" min="0"
+      style="width:68px;padding:4px 8px;font-size:12px;border:1px solid var(--border-strong);border-radius:6px;font-family:'DM Sans',sans-serif;outline:none;"
+      oninput="renderInventory()" />
+  </label>
+  <span style="color:var(--border-strong);font-size:14px;">|</span>
+  <span id="feeNote" style="font-size:11px;color:var(--text-secondary);font-style:italic;"></span>
+</div>
+
+
+  <!-- Stats -->
+  <div class="stats-bar" id="statsBar"></div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input class="search-input" id="searchInput" type="text" placeholder="Search inventory…" oninput="renderInventory()" />
+    </div>
+    <select class="filter-select" id="statusFilter" onchange="renderInventory()">
+      <option value="">All Statuses</option>
+      <option value="unlisted">Unlisted</option>
+      <option value="listed">Listed</option>
+      <option value="sold">Sold</option>
+    </select>
+    <div class="view-toggle">
+      <button class="view-btn active" id="gridBtn" onclick="setView('grid')" title="Grid view">
+        <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      </button>
+      <button class="view-btn" id="listBtn" onclick="setView('list')" title="List view">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Inventory container -->
+  <div id="inventoryContainer"></div>
+</main>
+
+<!-- ADD / EDIT MODAL -->
+<div class="modal-overlay" id="formModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="formModalTitle">Add Item</h2>
+      <button class="modal-close" onclick="closeFormModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Item Name *</label>
+          <input type="text" id="f_name" placeholder="e.g. Nike Air Max 90 Size 11" />
+        </div>
+        <div class="form-group">
+          <label>Purchase Price ($)</label>
+          <input type="number" id="f_buy" placeholder="0.00" step="0.01" min="0" />
+        </div>
+        <div class="form-group">
+          <label>Sale / List Price ($)</label>
+          <input type="number" id="f_sell" placeholder="0.00" step="0.01" min="0" />
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="f_status">
+            <option value="unlisted">Unlisted</option>
+            <option value="listed">Listed</option>
+            <option value="sold">Sold</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>SKU / Reference</label>
+          <input type="text" id="f_sku" placeholder="Optional" />
+        </div>
+        <div class="form-group full">
+          <label>Description</label>
+          <textarea id="f_desc" placeholder="Condition, brand, model details…"></textarea>
+        </div>
+        <div class="form-group full">
+          <label>Notes</label>
+          <textarea id="f_notes" placeholder="Where you bought it, tips, reminders…" style="min-height:56px;"></textarea>
+        </div>
+        <div class="form-group full">
+          <label>Photo</label>
+          <div class="photo-upload" onclick="document.getElementById('f_photo_input').click()">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="color:var(--text-secondary);margin-bottom:6px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <div style="font-size:12px;color:var(--text-secondary)">Click to upload a photo</div>
+            <input type="file" id="f_photo_input" accept="image/*" onchange="handlePhotoUpload(this)" />
+            <img id="f_photo_preview" class="photo-preview" />
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-outline" onclick="closeFormModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveItem()">Save Item</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="detailTitle">Item Detail</h2>
+      <button class="modal-close" onclick="closeDetailModal()">✕</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── STATE ──
+  let inventory = JSON.parse(localStorage.getItem('hb_inventory') || '[]');
+  let editingId = null;
+  let currentView = 'grid';
+  let photoData = null;
+
+  function save() { localStorage.setItem('hb_inventory', JSON.stringify(inventory)); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+  // ── eBay FEE HELPERS ──
+  function getFeeConfig() {
+    return {
+      fvf: parseFloat(document.getElementById('cfg_fvf').value) / 100 || 0.1325,
+      txn: parseFloat(document.getElementById('cfg_txn').value) || 0.30,
+      ship: parseFloat(document.getElementById('cfg_ship').value) || 0,
+    };
+  }
+
+  // Returns { fees, netProfit, margin } for a given item
+  function calcItem(item) {
+    const cfg = getFeeConfig();
+    const buy = parseFloat(item.buy) || 0;
+    const sell = parseFloat(item.sell) || 0;
+    const fees = sell > 0 ? +(sell * cfg.fvf + cfg.txn + cfg.ship).toFixed(2) : 0;
+    const netProfit = +(sell - buy - fees).toFixed(2);
+    const margin = sell > 0 ? +((netProfit / sell) * 100).toFixed(1) : 0;
+    return { buy, sell, fees, netProfit, margin };
+  }
+
+  function updateFeeNote() {
+    const cfg = getFeeConfig();
+    const sample = 50;
+    const sampleFee = +(sample * cfg.fvf + cfg.txn + cfg.ship).toFixed(2);
+    const el = document.getElementById('feeNote');
+    if (el) el.textContent = `Example: $${sample} sale → $${sampleFee} in fees (FVF + txn + shipping)`;
+  }
+
+  // ── STATS ──
+  function renderStats() {
+    updateFeeNote();
+    const total = inventory.length;
+    const totalCost = inventory.reduce((s, i) => s + (parseFloat(i.buy) || 0), 0);
+    const soldItems = inventory.filter(i => i.status === 'sold');
+    const totalRevenue = soldItems.reduce((s, i) => s + (parseFloat(i.sell) || 0), 0);
+    const totalFees = soldItems.reduce((s, i) => s + calcItem(i).fees, 0);
+    const soldCost = soldItems.reduce((s, i) => s + (parseFloat(i.buy) || 0), 0);
+    const netProfit = totalRevenue - soldCost - totalFees;
+    const listed = inventory.filter(i => i.status === 'listed').length;
+    const avgMargin = soldItems.length
+      ? +(soldItems.reduce((s, i) => s + calcItem(i).margin, 0) / soldItems.length).toFixed(1)
+      : 0;
+
+    document.getElementById('statsBar').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">Total Items</div>
+        <div class="stat-value">${total}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Invested</div>
+        <div class="stat-value">$${totalCost.toFixed(2)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Net Profit (after fees)</div>
+        <div class="stat-value ${netProfit >= 0 ? 'green' : 'red'}">$${netProfit.toFixed(2)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Margin (sold)</div>
+        <div class="stat-value ${avgMargin >= 0 ? 'green' : 'red'}">${avgMargin}%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Currently Listed</div>
+        <div class="stat-value">${listed}</div>
+      </div>
+    `;
+  }
+
+  // ── FILTER ──
+  function getFiltered() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    const s = document.getElementById('statusFilter').value;
+    return inventory.filter(item => {
+      const matchQ = !q || item.name.toLowerCase().includes(q) || (item.desc||'').toLowerCase().includes(q) || (item.sku||'').toLowerCase().includes(q);
+      const matchS = !s || item.status === s;
+      return matchQ && matchS;
+    });
+  }
+
+  // ── BADGE HELPERS ──
+  function netProfitBadge(item) {
+    const { sell, netProfit, margin } = calcItem(item);
+    if (!sell) return '';
+    const cls = netProfit >= 0 ? 'pos' : 'neg';
+    return `<span class="profit-badge ${cls}" title="After eBay fees">${netProfit >= 0 ? '+' : ''}$${netProfit.toFixed(2)} (${margin}%)</span>`;
+  }
+
+  function statusBadge(status) {
+    const map = { listed: 'status-listed', unlisted: 'status-unlisted', sold: 'status-sold' };
+    const label = status.charAt(0).toUpperCase() + status.slice(1);
+    return `<span class="card-status ${map[status]||''}">${label}</span>`;
+  }
+
+  function photoEl(item) {
+    if (item.photo) return `<div class="card-photo"><img src="${item.photo}" alt="${item.name}" /></div>`;
+    return `<div class="card-photo" style="font-size:32px;">📦</div>`;
+  }
+
+  // ── RENDER ──
+  function renderInventory() {
+    renderStats();
+    const items = getFiltered();
+    const container = document.getElementById('inventoryContainer');
+
+    if (inventory.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">📦</div>
+          <h3>No items yet</h3>
+          <p>Start building your inventory by adding your first purchase.</p>
+          <button class="btn btn-primary" onclick="openAddModal()">Add First Item</button>
+        </div>`;
+      return;
+    }
+
+    if (items.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">🔍</div>
+          <h3>No results</h3>
+          <p>Try adjusting your search or filter.</p>
+        </div>`;
+      return;
+    }
+
+    if (currentView === 'grid') {
+      container.innerHTML = `<div class="inventory-grid">${items.map(item => {
+        const { buy, sell, fees, netProfit, margin } = calcItem(item);
+        return `
+        <div class="item-card" onclick="openDetail('${item.id}')">
+          ${photoEl(item)}
+          <div class="card-body">
+            <div class="card-title">${item.name}</div>
+            <div class="card-desc">${item.desc || '<span style="color:var(--border-strong)">No description</span>'}</div>
+            <div class="card-prices">
+              <div>
+                <div class="price-bought">Paid $${buy.toFixed(2)}</div>
+                <div class="price-sell">List $${sell.toFixed(2)}</div>
+              </div>
+              ${netProfitBadge(item)}
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+              ${statusBadge(item.status)}
+              ${sell > 0 ? `<span style="font-size:11px;color:var(--text-secondary);">eBay fees: $${fees.toFixed(2)}</span>` : ''}
+            </div>
+          </div>
+          <div class="card-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-outline btn-sm" onclick="openEdit('${item.id}')">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}')">Delete</button>
+          </div>
+        </div>`;
+      }).join('')}</div>`;
+    } else {
+      container.innerHTML = `
+        <table class="inventory-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Name</th>
+              <th>SKU</th>
+              <th>Paid</th>
+              <th>Sale Price</th>
+              <th>eBay Fees</th>
+              <th>Net Profit</th>
+              <th>Margin</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map(item => {
+              const { buy, sell, fees, netProfit, margin } = calcItem(item);
+              const profitColor = netProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+              return `
+              <tr>
+                <td>
+                  ${item.photo
+                    ? `<div class="table-thumb"><img src="${item.photo}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;"/></div>`
+                    : `<div class="table-thumb">📦</div>`}
+                </td>
+                <td style="font-weight:500;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.name}</td>
+                <td style="color:var(--text-secondary)">${item.sku || '—'}</td>
+                <td>$${buy.toFixed(2)}</td>
+                <td>$${sell.toFixed(2)}</td>
+                <td style="color:var(--accent-red)">${sell > 0 ? '$'+fees.toFixed(2) : '—'}</td>
+                <td style="font-weight:600;color:${profitColor}">${sell > 0 ? (netProfit>=0?'+':'')+'$'+netProfit.toFixed(2) : '—'}</td>
+                <td style="color:${profitColor}">${sell > 0 ? margin+'%' : '—'}</td>
+                <td>${statusBadge(item.status)}</td>
+                <td>
+                  <div style="display:flex;gap:6px;">
+                    <button class="btn btn-outline btn-sm" onclick="openEdit('${item.id}')">Edit</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}')">Del</button>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    }
+  }
+
+  // ── VIEW TOGGLE ──
+  function setView(v) {
+    currentView = v;
+    document.getElementById('gridBtn').classList.toggle('active', v === 'grid');
+    document.getElementById('listBtn').classList.toggle('active', v === 'list');
+    renderInventory();
+  }
+
+  // ── FORM MODAL ──
+  function openAddModal() {
+    editingId = null; photoData = null;
+    document.getElementById('formModalTitle').textContent = 'Add Item';
+    ['f_name','f_buy','f_sell','f_sku','f_desc','f_notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f_status').value = 'unlisted';
+    document.getElementById('f_photo_preview').style.display = 'none';
+    document.getElementById('f_photo_input').value = '';
+    document.getElementById('formModal').classList.add('open');
+  }
+
+  function openEdit(id) {
+    const item = inventory.find(i => i.id === id);
+    if (!item) return;
+    editingId = id; photoData = item.photo || null;
+    document.getElementById('formModalTitle').textContent = 'Edit Item';
+    document.getElementById('f_name').value = item.name;
+    document.getElementById('f_buy').value = item.buy || '';
+    document.getElementById('f_sell').value = item.sell || '';
+    document.getElementById('f_sku').value = item.sku || '';
+    document.getElementById('f_desc').value = item.desc || '';
+    document.getElementById('f_notes').value = item.notes || '';
+    document.getElementById('f_status').value = item.status || 'unlisted';
+    const prev = document.getElementById('f_photo_preview');
+    if (item.photo) { prev.src = item.photo; prev.style.display = 'block'; }
+    else { prev.style.display = 'none'; }
+    document.getElementById('formModal').classList.add('open');
+  }
+
+  function closeFormModal() { document.getElementById('formModal').classList.remove('open'); }
+
+  function handlePhotoUpload(input) {
+    const file = input.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      photoData = e.target.result;
+      const prev = document.getElementById('f_photo_preview');
+      prev.src = photoData; prev.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function saveItem() {
+    const name = document.getElementById('f_name').value.trim();
+    if (!name) { toast('Please enter an item name.'); return; }
+    const item = {
+      id: editingId || uid(), name,
+      buy: document.getElementById('f_buy').value,
+      sell: document.getElementById('f_sell').value,
+      sku: document.getElementById('f_sku').value.trim(),
+      desc: document.getElementById('f_desc').value.trim(),
+      notes: document.getElementById('f_notes').value.trim(),
+      status: document.getElementById('f_status').value,
+      photo: photoData || null,
+      updatedAt: new Date().toISOString(),
+    };
+    if (editingId) {
+      const idx = inventory.findIndex(i => i.id === editingId);
+      item.createdAt = inventory[idx].createdAt;
+      inventory[idx] = item; toast('Item updated!');
+    } else {
+      item.createdAt = new Date().toISOString();
+      inventory.unshift(item); toast('Item added!');
+    }
+    save(); closeFormModal(); renderInventory();
+  }
+
+  // ── DELETE ──
+  function deleteItem(id) {
+    if (!confirm('Delete this item? This cannot be undone.')) return;
+    inventory = inventory.filter(i => i.id !== id);
+    save(); renderInventory(); toast('Item deleted.');
+  }
+
+  // ── DETAIL MODAL ──
+  function openDetail(id) {
+    const item = inventory.find(i => i.id === id);
+    if (!item) return;
+    const { buy, sell, fees, netProfit, margin } = calcItem(item);
+    const cfg = getFeeConfig();
+
+    document.getElementById('detailTitle').textContent = item.name;
+    document.getElementById('detailBody').innerHTML = `
+      ${item.photo
+        ? `<div class="detail-photo"><img src="${item.photo}" alt="${item.name}" /></div>`
+        : `<div class="detail-photo" style="font-size:48px;display:flex;align-items:center;justify-content:center;min-height:100px;">📦</div>`}
+      <div class="detail-row"><span class="detail-key">Status</span><span class="detail-val">${statusBadge(item.status)}</span></div>
+      ${item.sku ? `<div class="detail-row"><span class="detail-key">SKU</span><span class="detail-val">${item.sku}</span></div>` : ''}
+      <div class="detail-row"><span class="detail-key">Purchase Price</span><span class="detail-val">$${buy.toFixed(2)}</span></div>
+      <div class="detail-row"><span class="detail-key">Sale / List Price</span><span class="detail-val">$${sell.toFixed(2)}</span></div>
+      ${sell > 0 ? `
+      <div class="detail-row" style="background:#fafaf8;border-radius:6px;padding:10px 12px;margin:4px 0;border:none;">
+        <span class="detail-key" style="color:var(--accent-red);">eBay Fees Breakdown</span>
+        <span class="detail-val" style="font-size:12px;text-align:right;line-height:1.8;">
+          FVF (${(cfg.fvf*100).toFixed(2)}%): $${(sell*cfg.fvf).toFixed(2)}<br/>
+          Transaction: $${cfg.txn.toFixed(2)}<br/>
+          Shipping: $${cfg.ship.toFixed(2)}<br/>
+          <strong>Total fees: $${fees.toFixed(2)}</strong>
+        </span>
+      </div>
+      <div class="detail-row"><span class="detail-key">Net Profit (after fees)</span>
+        <span class="detail-val" style="font-weight:700;color:${netProfit>=0?'var(--accent-green)':'var(--accent-red)'};">
+          ${netProfit>=0?'+':''}$${netProfit.toFixed(2)}
+        </span>
+      </div>
+      <div class="detail-row"><span class="detail-key">Profit Margin</span>
+        <span class="detail-val" style="font-weight:600;color:${margin>=0?'var(--accent-green)':'var(--accent-red)'};">${margin}%</span>
+      </div>
+      ` : ''}
+      ${item.desc ? `<div class="detail-row"><span class="detail-key">Description</span><span class="detail-val" style="max-width:300px;">${item.desc}</span></div>` : ''}
+      ${item.notes ? `<div class="detail-row"><span class="detail-key">Notes</span><span class="detail-val" style="max-width:300px;">${item.notes}</span></div>` : ''}
+      <div class="detail-row"><span class="detail-key">Added</span><span class="detail-val">${new Date(item.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span></div>
+      <div style="display:flex;gap:8px;margin-top:18px;">
+        <button class="btn btn-primary" onclick="closeDetailModal();openEdit('${item.id}')">Edit Item</button>
+        <button class="btn btn-danger" onclick="closeDetailModal();deleteItem('${item.id}')">Delete</button>
+      </div>`;
+    document.getElementById('detailModal').classList.add('open');
+  }
+
+  function closeDetailModal() { document.getElementById('detailModal').classList.remove('open'); }
+
+  // ── EXPORT CSV ──
+  function exportCSV() {
+    if (inventory.length === 0) { toast('Nothing to export.'); return; }
+    const headers = ['Name','SKU','Purchase Price','Sale Price','eBay Fees','Net Profit','Margin %','Status','Description','Notes','Created'];
+    const rows = inventory.map(i => {
+      const { buy, sell, fees, netProfit, margin } = calcItem(i);
+      return [i.name, i.sku||'', buy.toFixed(2), sell.toFixed(2), fees.toFixed(2), netProfit.toFixed(2), margin+'%', i.status, i.desc||'', i.notes||'', new Date(i.createdAt).toLocaleDateString()]
+        .map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
+    });
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'inventory.csv'; a.click();
+    URL.revokeObjectURL(url);
+    toast('CSV exported!');
+  }
+
+  // ── TOAST ──
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2800);
+  }
+
+  document.getElementById('formModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeFormModal(); });
+  document.getElementById('detailModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeDetailModal(); });
+
+  renderInventory();
+</script>
+</body>
+</html>
